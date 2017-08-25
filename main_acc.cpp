@@ -9,36 +9,42 @@
 #include <string.h>
 #include <stdlib.h>
 
-
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
-enum STATE 
-{
-    NORMAL      =   ( 0UL<<20 ), 
-    TIME_SET    =   ( 1UL<<20 ), 
-    ALARM_SET   =   ( 2UL<<20 )
-} State;
-
-enum ACTIVE_FIELD 
-{
-    ACT_SEC     =   ( 0UL<<17 ),
-    ACT_HH      =   ( 1UL<<17 ),
-    ACT_MM      =   ( 2UL<<17 ),
-    ACT_ALM     =   ( 3UL<<17 )    
-} act_fld;
-
-enum ALM_EN
-{
-    ALM_EN_OFF  =   ( 0UL<<19 ),
-    ALM_EN_ON   =   ( 1UL<<19 )   
-}alm_en;
-
-
+#define ALM_TRG_SHIFT   ( 23UL )
 #define STARTUP_SHIFT   ( 22UL )
 #define STATE_SHIFT     ( 20UL )
 #define ALM_EN_SHIFT    ( 19UL )
 #define FLD_SHIFT       ( 17UL )
 
+enum ALM_TRG
+{
+    ALM_TRG_OFF  =   ( 0UL<<ALM_TRG_SHIFT ),
+    ALM_TRG_ON   =   ( 1UL<<ALM_TRG_SHIFT )   
+}alm_trg;
+
+enum STATE 
+{
+    NORMAL      =   ( 0UL<<STATE_SHIFT ), 
+    TIME_SET    =   ( 1UL<<STATE_SHIFT ), 
+    ALARM_SET   =   ( 2UL<<STATE_SHIFT )
+} State;
+
+enum ACTIVE_FIELD 
+{
+    ACT_SEC     =   ( 0UL<<FLD_SHIFT ),
+    ACT_HH      =   ( 1UL<<FLD_SHIFT ),
+    ACT_MM      =   ( 2UL<<FLD_SHIFT ),
+    ACT_ALM     =   ( 3UL<<FLD_SHIFT )    
+} act_fld;
+
+enum ALM_EN
+{
+    ALM_EN_OFF  =   ( 0UL<<ALM_EN_SHIFT ),
+    ALM_EN_ON   =   ( 1UL<<ALM_EN_SHIFT )   
+}alm_en;
+
+#define ALM_TRG_MASK    ((uint32_t) ( 1UL<<ALM_TRG_SHIFT ))
 #define STARTUP_MASK    ((uint32_t) ( 1UL<<STARTUP_SHIFT ))
 #define STATE_MASK      ((uint32_t) ( 3UL<<STATE_SHIFT ))
 #define ALM_EN_MASK     ((uint32_t) ( 1UL<<ALM_EN_SHIFT ))
@@ -48,18 +54,6 @@ enum ALM_EN
 
 
 enum MERIDIAN {AM, PM};
-
-typedef struct
-{
-    int hh;
-    int mm;
-    int sec;
-    MERIDIAN meridien;
-    enum alm {OFF, ON};
-    enum fld {HOUR, MIN, ALARM};
-    STATE state;
-}STATETIME;
-
 
 
 /* Priorities at which the tasks are created. */
@@ -215,10 +209,6 @@ static void tskReadInput(void *pvParameters)
 
         /* Check Key Input */
         val = analogRead(0);      // read the value from the sensor
-//        Serial.print(millis());
-//        Serial.print("\t  ");
-//        Serial.println(val);
-
         if (val >= 652)  curBtn =            btnNONE; // We make this the 1st option for speed reasons since it will be the most likely result
         if (val < 38)    curBtn =            btnRIGHT; 
         if (val < 136 && val >= 38)   curBtn = btnUP;
@@ -308,26 +298,12 @@ static void tskController(void *pvParameters)
     uint32_t ulReceivedValue;
     uint32_t ulQueuedValue = 0;
 
-    
-
-    static STATETIME NormalTime, Time_SetTime, Alarm_SetTime;
-    NormalTime.state = NORMAL;
-    Time_SetTime.state = TIME_SET;
-    Alarm_SetTime.state = ALARM_SET;
-
     static uint32_t NTime, STime, ATime;
     STime = 0;
 
-//    uint32_t ulSuperState;
-//    uint32_t ulState;
-//    uint32_t ulSubState;
     State = TIME_SET;
     bool bNEWSTATE = true;
     bool bStartUp = true;
-
-    uint32_t ulSubStateCounter;
-
-    uint32_t T; // tick counter
 
     /* Prevent the compiler warning about the unused parameter. */
     (void)pvParameters;
@@ -632,24 +608,7 @@ static void tskController(void *pvParameters)
 
         switch(ulReceivedValue)
         {
-//            case btnNONE:
-//                Serial.println("NONE");
-//                break;
-//            case btnRIGHT:
-//                Serial.println("RIGHT");
-//                break;
-//            case btnUP:
-//                Serial.println("UP");
-//                break;
-//            case btnDOWN:
-//                Serial.println("DOWN");
-//                break;
-//            case btnLEFT:
-//                Serial.println("LEFT");
-//                break;
-//            case btnSELECT:
-//                Serial.println("SELECT");
-//                break;
+
             case TIME_TICK:
                 Serial.println("TICK");
                 if(~bStartUp)
