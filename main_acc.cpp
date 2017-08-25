@@ -296,20 +296,23 @@ static void tskReadTime(void *pvParameters)
 static void tskController(void *pvParameters)
 {
     uint32_t ulReceivedValue;
-    uint32_t ulQueuedValue = 0;
+    static uint32_t ulQueuedValue;
 
     static uint32_t NTime, STime, ATime;
-    STime = 0;
 
+    // Initialize flags
+    alm_trg = ALM_TRG_OFF; 
+    alm_en = ALM_EN_OFF;
+    act_fld = ACT_HH;
     State = TIME_SET;
+    
     bool bNEWSTATE = true;
     bool bStartUp = true;
 
+    ulReceivedValue = btnNONE;
+
     /* Prevent the compiler warning about the unused parameter. */
     (void)pvParameters;
-
-
-    ulReceivedValue = btnNONE;
 
     for (;; )
     {
@@ -394,8 +397,12 @@ static void tskController(void *pvParameters)
                 break;
 
             case TIME_SET:
+                bool bUPDATE_TIME;
                 if(bNEWSTATE)
                 {
+                    bNEWSTATE = false;
+                    bUPDATE_TIME = false;
+                    
                     act_fld = ACT_HH;
                     ulQueuedValue &= ~(FLD_MASK);
                     ulQueuedValue != act_fld;
@@ -410,10 +417,9 @@ static void tskController(void *pvParameters)
                     
                     if(bStartUp)
                         ulQueuedValue |= STARTUP_MASK;
-                    ulQueuedValue |= act_fld; 
-                    Serial.println(ulQueuedValue);
-                    bNEWSTATE = false;
+                    Serial.println(ulQueuedValue); 
                 }
+                
                 switch(ulReceivedValue)
                 {
                     case btnSELECT:
@@ -421,7 +427,8 @@ static void tskController(void *pvParameters)
                         {
                             State = NORMAL;
                             bNEWSTATE = true;
-                            NTime = STime;
+                            if(bUPDATE_TIME)
+                                NTime = STime;
                         }
                         break;
 
@@ -436,6 +443,7 @@ static void tskController(void *pvParameters)
 
                     case btnUP:
                         bStartUp = false;
+                        bUPDATE_TIME = true;
                         // Clear StartUp Bit
                         ulQueuedValue &= ~(STARTUP_MASK);
                         switch(act_fld)
@@ -460,6 +468,7 @@ static void tskController(void *pvParameters)
                         
                     case btnDOWN:
                         bStartUp = false;
+                        bUPDATE_TIME = true;
                         // Clear StartUp Bit
                         ulQueuedValue &= ~(STARTUP_MASK);
                         switch(act_fld)
@@ -501,21 +510,7 @@ static void tskController(void *pvParameters)
                     Serial.println("ALARM_SET State");
                     bNEWSTATE = false;
 
-                    // Change State
-                    ulQueuedValue &= ~(STATE_MASK);
-                    ulQueuedValue |= State;
-                }
-                switch(ulReceivedValue)
-                {
-                    case btnSELECT:
-                        State = NORMAL;
-                        bNEWSTATE = true;
-                        break;
-                    
-                }
-                break;
-                if(bNEWSTATE)
-                {
+                    // Initialize active field to HH
                     act_fld = ACT_HH;
                     ulQueuedValue &= ~(FLD_MASK);
                     ulQueuedValue != act_fld;
@@ -524,12 +519,10 @@ static void tskController(void *pvParameters)
                     ulQueuedValue &= ~(STATE_MASK);
                     ulQueuedValue |= State;
                     
-                    // Clear and Replace STime
+                    // Clear and Replace NTime with ATime
                     ulQueuedValue &= ~(TIME_MASK);
                     ulQueuedValue |= ATime;
-                    
-                    Serial.println(ulQueuedValue);
-                    bNEWSTATE = false;
+
                 }
                 switch(ulReceivedValue)
                 {
@@ -540,16 +533,17 @@ static void tskController(void *pvParameters)
                             bNEWSTATE = true;
                         }
                         break;
-
+    
                     case btnLEFT:
                         if(act_fld == ACT_MM)
                             act_fld = ACT_HH;
                         break;
+                        
                     case btnRIGHT:
                         if(act_fld == ACT_HH)
                             act_fld = ACT_MM;
                         break;
-
+    
                     case btnUP:
                         switch(act_fld)
                         {
@@ -559,7 +553,7 @@ static void tskController(void *pvParameters)
                                 if(ATime >= 24UL*3600UL)
                                     ATime -= 24UL*3600UL;
                                 break;
-
+    
                             case ACT_MM:
                                 uint32_t hr = (uint32_t)(ATime/3600UL);
                                 uint32_t min = (uint32_t)((ATime - hr*3600UL)/60UL);
@@ -581,7 +575,7 @@ static void tskController(void *pvParameters)
                                 else
                                     ATime -= 3600UL;
                                 break;
-
+    
                             case ACT_MM:
                                 uint32_t hr = (uint32_t)(ATime/3600UL);
                                 uint32_t min = (uint32_t)((ATime - hr*3600UL)/60UL);
