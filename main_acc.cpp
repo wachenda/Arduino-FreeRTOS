@@ -176,7 +176,7 @@ void main_acc(void)
         xTaskCreate(tskController, "Controller", configMINIMAL_STACK_SIZE+10, NULL,
                     tskController_PRIORITY, NULL);
         
-        xTaskCreate(tskWriteDC, "WriteLC", configMINIMAL_STACK_SIZE+20, NULL,
+        xTaskCreate(tskWriteDC, "WriteLC", configMINIMAL_STACK_SIZE+25, NULL,
                     tskWriteDC_PRIORITY, NULL);
     }
 
@@ -299,6 +299,8 @@ static void tskController(void *pvParameters)
     static uint32_t ulQueuedValue;
 
     static uint32_t NTime, STime, ATime;
+    uint32_t hr;
+    uint32_t mn;
 
     // Initialize flags
     alm_trg = ALM_TRG_OFF; 
@@ -456,12 +458,12 @@ static void tskController(void *pvParameters)
                                 break;
 
                             case ACT_MM:
-                                uint32_t hr = (uint32_t)(STime/3600UL);
-                                uint32_t min = (uint32_t)((STime - hr*3600UL)/60UL);
-                                min++;
-                                if(min>59UL)
-                                    min = 0UL;
-                                STime = hr*3600UL+min*60UL;
+                                hr = (uint32_t)(STime/3600UL);
+                                mn = (uint32_t)((STime - hr*3600UL)/60UL);
+                                mn++;
+                                if(mn>59UL)
+                                    mn = 0UL;
+                                STime = hr*3600UL+mn*60UL;
                                 break;    
                         }
                         break;
@@ -482,13 +484,13 @@ static void tskController(void *pvParameters)
                                 break;
 
                             case ACT_MM:
-                                uint32_t hr = (uint32_t)(STime/3600UL);
-                                uint32_t min = (uint32_t)((STime - hr*3600UL)/60UL);
-                                if(min==0UL)
-                                    min = 59UL;
+                                hr = (uint32_t)(STime/3600UL);
+                                mn = (uint32_t)((STime - hr*3600UL)/60UL);
+                                if(mn==0UL)
+                                    mn = 59UL;
                                 else
-                                    min--;
-                                STime = hr*3600UL+min*60UL;
+                                    mn--;
+                                STime = hr*3600UL+mn*60UL;
                                 break;    
                         }  
                 }
@@ -537,11 +539,15 @@ static void tskController(void *pvParameters)
                     case btnLEFT:
                         if(act_fld == ACT_MM)
                             act_fld = ACT_HH;
+                        else if(act_fld == ACT_ALM)
+                            act_fld = ACT_MM;
                         break;
                         
                     case btnRIGHT:
                         if(act_fld == ACT_HH)
                             act_fld = ACT_MM;
+                        else if(act_fld == ACT_MM)
+                            act_fld = ACT_ALM;
                         break;
     
                     case btnUP:
@@ -555,13 +561,16 @@ static void tskController(void *pvParameters)
                                 break;
     
                             case ACT_MM:
-                                uint32_t hr = (uint32_t)(ATime/3600UL);
-                                uint32_t min = (uint32_t)((ATime - hr*3600UL)/60UL);
-                                min++;
-                                if(min>59UL)
-                                    min = 0UL;
-                                ATime = hr*3600UL+min*60UL;
+                                hr = (uint32_t)(ATime/3600UL);
+                                mn = (uint32_t)((ATime - hr*3600UL)/60UL);
+                                mn++;
+                                if(mn>59UL)
+                                    mn = 0UL;
+                                ATime = hr*3600UL+mn*60UL;
                                 break;    
+                            case ACT_ALM:
+                                alm_en = ALM_EN_ON;
+                                break;
                         }
                         break;
                         
@@ -577,18 +586,24 @@ static void tskController(void *pvParameters)
                                 break;
     
                             case ACT_MM:
-                                uint32_t hr = (uint32_t)(ATime/3600UL);
-                                uint32_t min = (uint32_t)((ATime - hr*3600UL)/60UL);
-                                if(min==0UL)
-                                    min = 59UL;
+                                hr = (uint32_t)(ATime/3600UL);
+                                mn = (uint32_t)((ATime - hr*3600UL)/60UL);
+                                if(mn==0UL)
+                                    mn = 59UL;
                                 else
-                                    min--;
-                                ATime = hr*3600UL+min*60UL;
-                                break;    
+                                    mn--;
+                                ATime = hr*3600UL+mn*60UL;
+                                break;   
+                             case ACT_ALM:
+                                alm_en = ALM_EN_OFF;
+                                break; 
                         }  
                 }
-                ulQueuedValue &= ~(FLD_MASK);
-                ulQueuedValue != act_fld;
+                
+                
+                // Clear and Re-set alarm enable
+                ulQueuedValue &= ~(ALM_EN_MASK);
+                ulQueuedValue != alm_en;
                 
                 // Clear and Re-set active field
                 ulQueuedValue &= ~(FLD_MASK);
@@ -671,9 +686,14 @@ static void tskWriteDC( void *pvParameters )
 
         Serial.print("Startup Mask:  "); Serial.println(ulReceivedValue&STARTUP_MASK);
         uint32_t curstate = ulReceivedValue&STATE_MASK;
-        Serial.print("State Mask:  "); Serial.println(curstate);
         uint32_t curfield = ulReceivedValue&FLD_MASK;
+        uint32_t cur_alrm_en = ulReceivedValue&ALM_EN_MASK;
+        uint32_t cur_alrm_trg = ulReceivedValue&ALM_TRG_MASK;
+        Serial.print("State Mask:  "); Serial.println(curstate);
         Serial.print("Field Mask:  "); Serial.println(curfield);
+        Serial.print("ALM_EN Mask:  "); Serial.println(cur_alrm_en);
+        Serial.print("ALM_TRG Mask:  "); Serial.println(cur_alrm_trg);
+        
       
         if(hh<12UL)
             meridien = "AM";
@@ -812,6 +832,28 @@ static void tskWriteDC( void *pvParameters )
                 }
                 else
                     lcd.print(meridien);
+
+//                lcd.print(" ");
+//                if(curfield==ACT_ALM)
+//                {
+//                    
+//                    if(bFlash)
+//                    {
+//                        if(cur_alrm_en==ALM_EN_ON)
+//                            lcd.print("ON ");
+//                        else
+//                            lcd.print("OFF");
+//                    }
+//                    else
+//                        lcd.print("   ");
+//                }
+//                else
+//                {
+//                    if(cur_alrm_en==ALM_EN_ON)
+//                        lcd.print("ON ");
+//                    else
+//                        lcd.print("OFF");
+//                }
 
                 lcd.setCursor(2,1);
                 lcd.print("Set Alarm");
