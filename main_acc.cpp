@@ -17,6 +17,8 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 #define ALM_EN_SHIFT    ( 19UL )
 #define FLD_SHIFT       ( 17UL )
 
+#define ALM_DURATION_SEC    ( 60UL )
+
 enum ALM_TRG
 {
     ALM_TRG_OFF  =   ( 0UL<<ALM_TRG_SHIFT ),
@@ -353,10 +355,28 @@ static void tskController(void *pvParameters)
                         State = ALARM_SET;
                         bNEWSTATE = true;
                         break;
+                    case btnSELECT:
+//                        alm_trg = ALM_TRG_OFF;
+                        ulQueuedValue &= ~(ALM_TRG_MASK);
+                        break;
                     case TIME_TICK:
-                        // Clear and Replace STime
+                        // Clear and Replace with updated NTime
                         ulQueuedValue &= ~(TIME_MASK);
                         ulQueuedValue |= NTime;
+                        Serial.println(); Serial.print("Compare NTIME and ATime:  "); Serial.print(NTime); Serial.print(" "); Serial.println(ATime);
+                        if(NTime==ATime && alm_en==ALM_EN_ON)
+                        {
+//                            alm_trg = ALM_TRG_ON;
+                            ulQueuedValue &= ~(ALM_TRG_MASK);
+                            ulQueuedValue |= ALM_TRG_MASK;
+                        }
+                        if(NTime == ATime+ALM_DURATION_SEC)
+                        {
+//                            alm_trg = ALM_TRG_OFF;
+                            ulQueuedValue &= ~(ALM_TRG_MASK);
+                           
+                        }
+                            
                         break;
                     
                 }
@@ -376,7 +396,11 @@ static void tskController(void *pvParameters)
                     // Change State
                     ulQueuedValue &= ~(STATE_MASK);
                     ulQueuedValue |= State;
-                    
+
+                    // Use current NTime (current time) but set seconds to 00
+                    hr = (uint32_t)(NTime/3600UL);
+                    mn = (uint32_t)((NTime - hr*3600UL)/60UL);
+                    STime = hr*3600UL+mn*60UL;
                     // Clear and Replace STime
                     ulQueuedValue &= ~(TIME_MASK);
                     ulQueuedValue |= STime;
@@ -659,11 +683,11 @@ static void tskWriteDC( void *pvParameters )
 //        uint32_t curstate = ulReceivedValue&STATE_MASK;
 //        uint32_t curfield = ulReceivedValue&FLD_MASK;
 //        uint32_t cur_alrm_en = ulReceivedValue&ALM_EN_MASK;
-        uint32_t cur_alrm_trg = ulReceivedValue&ALM_TRG_MASK;
+//        uint32_t cur_alrm_trg = ulReceivedValue&ALM_TRG_MASK;
 //        Serial.print("State Mask:  "); Serial.println((ulReceivedValue&STATE_MASK));
 //        Serial.print("Field Mask:  "); Serial.println((ulReceivedValue&FLD_MASK));
 //        Serial.print("ALM_EN Mask:  "); Serial.println((ulReceivedValue&ALM_EN_MASK));
-        Serial.print("ALM_TRG Mask:  "); Serial.println(cur_alrm_trg);
+        Serial.print("ALM_TRG Mask:  "); Serial.println((ulReceivedValue&ALM_TRG_MASK));
         
       
         if(hh<12UL)
