@@ -657,6 +657,8 @@ static void tskWriteDC( void *pvParameters )
     uint32_t ulReceivedValue;
     uint32_t tm;
     uint32_t hh, mm;
+    int buzzerPin = 11;
+    pinMode(buzzerPin, OUTPUT); 
     
     char *meridien;
 
@@ -732,6 +734,7 @@ static void tskWriteDC( void *pvParameters )
                 lcd.print(mm);
                 lcd.print(" ");
                 lcd.print(meridien);
+                digitalWrite(buzzerPin, LOW);
                 if((ulReceivedValue&ALM_EN_MASK)==ALM_EN_ON)
                 {
                     if(!(ulReceivedValue&ALM_TRG_MASK))
@@ -739,9 +742,15 @@ static void tskWriteDC( void *pvParameters )
                     else
                     {
                         if(bFlash)
+                        {
                             lcd.print("   ALM");
+                            digitalWrite(buzzerPin, HIGH);
+                        }
                         else
+                        {
                             lcd.print("      ");
+                            digitalWrite(buzzerPin, LOW);
+                        }
                     }
                 }
                     
