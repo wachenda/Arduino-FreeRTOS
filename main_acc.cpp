@@ -733,7 +733,18 @@ static void tskWriteDC( void *pvParameters )
                 lcd.print(" ");
                 lcd.print(meridien);
                 if((ulReceivedValue&ALM_EN_MASK)==ALM_EN_ON)
-                    lcd.print("   ALM");
+                {
+                    if(!(ulReceivedValue&ALM_TRG_MASK))
+                        lcd.print("   ALM");
+                    else
+                    {
+                        if(bFlash)
+                            lcd.print("   ALM");
+                        else
+                            lcd.print("      ");
+                    }
+                }
+                    
 
             break;
 
