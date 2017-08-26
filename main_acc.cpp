@@ -68,7 +68,7 @@ The times are converted from milliseconds to ticks using the pdMS_TO_TICKS() mac
 
 /* The rate at which keyboard input is checked by ReadLPC.
 The times are converted from milliseconds to ticks using the pdMS_TO_TICKS() macro. */
-#define ReadInput_FREQUENCY_MS    pdMS_TO_TICKS( 25UL )
+#define ReadInput_FREQUENCY_MS    pdMS_TO_TICKS( 50UL )
 
 /* The number of items the queue can hold at once. */
 #define QUEUE_LENGTH    ( 6 )
@@ -85,37 +85,6 @@ The times are converted from milliseconds to ticks using the pdMS_TO_TICKS() mac
 #define btnNONE     ( 5UL )
 #define TIME_TICK   ( 6UL )
 
-//
-//#define LP_ON           ( 1UL )
-//#define LP_OFF          ( 2UL )
-//#define C_NORMAL        ( 3UL )
-//#define C_FAILURE       ( 4UL )
-//#define TIME_TICK       ( 5UL )
-
-/* The values sent to the queueWriteLC. */
-#define RL_ON           ( 1UL )
-#define RL_OFF          ( 2UL )
-#define GL_ON           ( 3UL )
-#define GL_OFF          ( 4UL )
-#define YL_ON           ( 5UL )
-#define YL_OFF          ( 6UL )
-
-/* SuperStates*/
-#define LP_ON                   ( 1UL )
-#define LP_OFF                  ( 2UL )
-#define LP_ON_C_NORMAL          ( 3UL )
-#define LP_ON_C_FAILURE         ( 4UL )
-#define LP_ON_C_NORMAL_R_ON     ( 5UL )
-#define LP_ON_C_NORMAL_G_ON     ( 6UL )
-#define LP_ON_C_NORMAL_Y_ON     ( 7UL )
-#define LP_ON_C_FAILURE_R_ON    ( 8UL )
-#define LP_ON_C_FAILURE_R_OFF   ( 9UL )
-
-#define DELAY_LP_ON_C_NORMAL_R_ON   ( 9UL )
-#define DELAY_LP_ON_C_NORMAL_G_ON   ( 6UL )
-#define DELAY_LP_ON_C_NORMAL_Y_ON   ( 3UL )
-#define DELAY_LP_ON_C_FAILURE_R_ON  ( 2UL )
-#define DELAY_LP_ON_C_FAILURE_R_OFF ( 2UL )
 
 /*-----------------------------------------------------------*/
 
@@ -134,14 +103,6 @@ static void tskWriteDC   (void *pvParameters);
 static QueueHandle_t queueWriteDC = NULL;
 /* The queue used by ReadLPC, ReadTime, and Controller tasks. */
 static QueueHandle_t queueController = NULL;
-
-
-static inline char *stringFromMeridien(enum MERIDIAN f)
-{
-    static const char *strings[] = { " AM", " PM" };
-
-    return strings[f];
-}
 
 void main_acc(void)
 {
@@ -170,13 +131,15 @@ void main_acc(void)
                     tskReadInput_PRIORITY,            /* The priority assigned to the task. */
                     NULL );                         /* The task handle is not required, so NULL is passed. */
 
-        xTaskCreate(tskReadTime, "ReadTime", configMINIMAL_STACK_SIZE, NULL, 
+        xTaskCreate(tskReadTime, "ReadTime", configMINIMAL_STACK_SIZE+5, NULL, 
                     tskReadTime_PRIORITY, NULL );
                     
-        xTaskCreate(tskController, "Controller", configMINIMAL_STACK_SIZE+10, NULL,
+        xTaskCreate(tskController, "Controller", configMINIMAL_STACK_SIZE+15, NULL,
                     tskController_PRIORITY, NULL);
         
-        xTaskCreate(tskWriteDC, "WriteLC", configMINIMAL_STACK_SIZE+25, NULL,
+//        xTaskCreate(tskWriteDC, "WriteLC", configMINIMAL_STACK_SIZE+60, NULL,
+//                    tskWriteDC_PRIORITY, NULL);
+        xTaskCreate(tskWriteDC, "WriteLC", configMINIMAL_STACK_SIZE+30, NULL,
                     tskWriteDC_PRIORITY, NULL);
     }
 
@@ -305,6 +268,7 @@ static void tskController(void *pvParameters)
     // Initialize flags
     alm_trg = ALM_TRG_OFF; 
     alm_en = ALM_EN_OFF;
+    
     act_fld = ACT_HH;
     State = TIME_SET;
     
@@ -476,7 +440,7 @@ static void tskController(void *pvParameters)
                         switch(act_fld)
                         {
                             case ACT_HH:
-                                Serial.print("Incrementing down hour "); Serial.println(STime);
+//                                Serial.print("Incrementing down hour "); Serial.println(STime);
                                 if(STime<3600UL)
                                     STime += 23UL*3600UL;
                                 else
@@ -511,6 +475,10 @@ static void tskController(void *pvParameters)
                 {
                     Serial.println("ALARM_SET State");
                     bNEWSTATE = false;
+
+                    ulQueuedValue &= ~(ALM_EN_MASK);
+                    ulQueuedValue |= alm_en;
+                    Serial.print("alm_en:  "); Serial.println(alm_en);
 
                     // Initialize active field to HH
                     act_fld = ACT_HH;
@@ -554,7 +522,7 @@ static void tskController(void *pvParameters)
                         switch(act_fld)
                         {
                             case ACT_HH:
-                                Serial.println("Incrementing up hour");
+//                                Serial.println("Incrementing up hour");
                                 ATime += 3600UL;
                                 if(ATime >= 24UL*3600UL)
                                     ATime -= 24UL*3600UL;
@@ -570,6 +538,8 @@ static void tskController(void *pvParameters)
                                 break;    
                             case ACT_ALM:
                                 alm_en = ALM_EN_ON;
+//                                ulQueuedValue &= ~(ALM_EN_MASK);
+//                                ulQueuedValue |= alm_en;
                                 break;
                         }
                         break;
@@ -578,7 +548,7 @@ static void tskController(void *pvParameters)
                         switch(act_fld)
                         {
                             case ACT_HH:
-                                Serial.print("Incrementing down hour "); Serial.println(ATime);
+//                                Serial.print("Incrementing down hour "); Serial.println(ATime);
                                 if(ATime<3600UL)
                                     ATime += 23UL*3600UL;
                                 else
@@ -596,6 +566,8 @@ static void tskController(void *pvParameters)
                                 break;   
                              case ACT_ALM:
                                 alm_en = ALM_EN_OFF;
+//                                ulQueuedValue &= ~(ALM_EN_MASK);
+//                                ulQueuedValue |= alm_en;
                                 break; 
                         }  
                 }
@@ -603,7 +575,7 @@ static void tskController(void *pvParameters)
                 
                 // Clear and Re-set alarm enable
                 ulQueuedValue &= ~(ALM_EN_MASK);
-                ulQueuedValue != alm_en;
+                ulQueuedValue |= alm_en;
                 
                 // Clear and Re-set active field
                 ulQueuedValue &= ~(FLD_MASK);
@@ -661,8 +633,7 @@ static void tskWriteDC( void *pvParameters )
     uint32_t ulReceivedValue;
     uint32_t tm;
     uint32_t hh, mm;
-    const char am[]="AM";
-    const char pm[]="PM";
+    
     char *meridien;
 
     bool bFlash=false;
@@ -685,13 +656,13 @@ static void tskWriteDC( void *pvParameters )
         mm = (uint32_t) (tm-hh*3600UL)/60UL;
 
         Serial.print("Startup Mask:  "); Serial.println(ulReceivedValue&STARTUP_MASK);
-        uint32_t curstate = ulReceivedValue&STATE_MASK;
-        uint32_t curfield = ulReceivedValue&FLD_MASK;
-        uint32_t cur_alrm_en = ulReceivedValue&ALM_EN_MASK;
+//        uint32_t curstate = ulReceivedValue&STATE_MASK;
+//        uint32_t curfield = ulReceivedValue&FLD_MASK;
+//        uint32_t cur_alrm_en = ulReceivedValue&ALM_EN_MASK;
         uint32_t cur_alrm_trg = ulReceivedValue&ALM_TRG_MASK;
-        Serial.print("State Mask:  "); Serial.println(curstate);
-        Serial.print("Field Mask:  "); Serial.println(curfield);
-        Serial.print("ALM_EN Mask:  "); Serial.println(cur_alrm_en);
+//        Serial.print("State Mask:  "); Serial.println((ulReceivedValue&STATE_MASK));
+//        Serial.print("Field Mask:  "); Serial.println((ulReceivedValue&FLD_MASK));
+//        Serial.print("ALM_EN Mask:  "); Serial.println((ulReceivedValue&ALM_EN_MASK));
         Serial.print("ALM_TRG Mask:  "); Serial.println(cur_alrm_trg);
         
       
@@ -719,7 +690,8 @@ static void tskWriteDC( void *pvParameters )
          bFlash = !bFlash;
 
 
-        switch(curstate)
+//        switch(curstate)
+        switch(ulReceivedValue&STATE_MASK)
         {
             case NORMAL:
                 lcd.print(hh);
@@ -736,12 +708,15 @@ static void tskWriteDC( void *pvParameters )
                 lcd.print(mm);
                 lcd.print(" ");
                 lcd.print(meridien);
+                if((ulReceivedValue&ALM_EN_MASK)==ALM_EN_ON)
+                    lcd.print("   ALM");
 
             break;
 
             case TIME_SET:
 
-                if(curfield == ACT_HH)
+//                if(curfield == ACT_HH)
+                if((ulReceivedValue&FLD_MASK) == ACT_HH)
                 {
                     if(bFlash)
                         lcd.print(hh);
@@ -756,7 +731,8 @@ static void tskWriteDC( void *pvParameters )
                 
                 lcd.print(":");
 
-                if(curfield == ACT_MM)
+//                if(curfield == ACT_MM)
+                if((ulReceivedValue&FLD_MASK) == ACT_MM)
                 {
                     if(bFlash)
                     {
@@ -774,7 +750,7 @@ static void tskWriteDC( void *pvParameters )
                     lcd.print(mm);
                 }
                 lcd.print(" ");
-                if(curfield == ACT_HH)
+                if((ulReceivedValue&FLD_MASK) == ACT_HH)
                 {
                     if(bFlash)
                         lcd.print(meridien);
@@ -790,7 +766,7 @@ static void tskWriteDC( void *pvParameters )
             break;
 
             case ALARM_SET:
-                if(curfield == ACT_HH)
+                if((ulReceivedValue&FLD_MASK) == ACT_HH)
                 {
                     if(bFlash)
                         lcd.print(hh);
@@ -805,7 +781,7 @@ static void tskWriteDC( void *pvParameters )
                 
                 lcd.print(":");
 
-                if(curfield == ACT_MM)
+                if((ulReceivedValue&FLD_MASK) == ACT_MM)
                 {
                     if(bFlash)
                     {
@@ -823,7 +799,7 @@ static void tskWriteDC( void *pvParameters )
                     lcd.print(mm);
                 }
                 lcd.print(" ");
-                if(curfield == ACT_HH)
+                if((ulReceivedValue&FLD_MASK) == ACT_HH)
                 {
                     if(bFlash)
                         lcd.print(meridien);
@@ -834,29 +810,32 @@ static void tskWriteDC( void *pvParameters )
                     lcd.print(meridien);
 
 //                lcd.print(" ");
-//                if(curfield==ACT_ALM)
-//                {
-//                    
-//                    if(bFlash)
-//                    {
-//                        if(cur_alrm_en==ALM_EN_ON)
-//                            lcd.print("ON ");
-//                        else
-//                            lcd.print("OFF");
-//                    }
-//                    else
-//                        lcd.print("   ");
-//                }
-//                else
-//                {
-//                    if(cur_alrm_en==ALM_EN_ON)
-//                        lcd.print("ON ");
-//                    else
-//                        lcd.print("OFF");
-//                }
 
-                lcd.setCursor(2,1);
-                lcd.print("Set Alarm");
+                if((ulReceivedValue&FLD_MASK)==ACT_ALM)
+                {
+                    
+                    if(bFlash)
+                    {
+                        if((ulReceivedValue&ALM_EN_MASK)==ALM_EN_ON)
+                            lcd.print(" ON ");
+                        else
+                            lcd.print(" OFF");
+                    }
+                    else
+                        lcd.print("   ");
+                }
+                else
+                {
+                    if((ulReceivedValue&ALM_EN_MASK)==ALM_EN_ON)
+                        lcd.print(" ON ");
+                    else
+                        lcd.print(" OFF");
+                }
+
+             
+
+//                lcd.setCursor(2,1);
+//                lcd.print("Set Alarm");
 
             break;
         }
