@@ -313,6 +313,8 @@ static void tskController(void *pvParameters)
         /* State Machine */
         switch(State)
         {
+            
+            /******************************************** NORMAL State ********************************************/
             case NORMAL:
                 if(bNEWSTATE)
                 {
@@ -339,6 +341,7 @@ static void tskController(void *pvParameters)
                     Serial.print("Normal:  ");
                     Serial.println(ulQueuedValue);
                 }
+                
                 switch(ulReceivedValue)
                 {
                     case btnUP:
@@ -369,13 +372,16 @@ static void tskController(void *pvParameters)
 //                            alm_trg = ALM_TRG_OFF;
                             ulQueuedValue &= ~(ALM_TRG_MASK);
                            
-                        }
-                            
-                        break;
-                    
+                        }  
+                        break;  
                 }
+                
+                xQueueSend(queueWriteDC, &ulQueuedValue, 0U);
                 break;
+            /******************************************** END of NORMAL State ********************************************/
 
+                
+            /******************************************** TIME_SET State ********************************************/
             case TIME_SET:
                 bool bUPDATE_TIME;
                 if(bNEWSTATE)
@@ -488,8 +494,15 @@ static void tskController(void *pvParameters)
                 // Clear and Replace STime
                 ulQueuedValue &= ~(TIME_MASK);
                 ulQueuedValue |= STime;
-                break;
 
+                xQueueSend(queueWriteDC, &ulQueuedValue, 0U);
+
+                break;
+            /******************************************** END of TIME_SET State ********************************************/
+
+
+                
+            /******************************************** ALARM_SET State ********************************************/
             case ALARM_SET:
                 if(bNEWSTATE)
                 {
@@ -604,8 +617,15 @@ static void tskController(void *pvParameters)
                 // Clear and Replace STime
                 ulQueuedValue &= ~(TIME_MASK);
                 ulQueuedValue |= ATime;
+
+                xQueueSend(queueWriteDC, &ulQueuedValue, 0U);
                 break;
         }
+        /******************************************** END of ALARM_SET State ********************************************/
+
+        
+       /******************************************** END OF STATE MACHINE  ********************************************/
+
 
         switch(ulReceivedValue)
         {
