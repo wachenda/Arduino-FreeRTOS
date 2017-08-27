@@ -5,12 +5,9 @@
 #include <timers.h>
 #include <semphr.h>  // add the FreeRTOS functions for Semaphores (or Flags).
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
+#define TICK_SHIFT      ( 24UL )
 #define ALM_TRG_SHIFT   ( 23UL )
 #define STARTUP_SHIFT   ( 22UL )
 #define STATE_SHIFT     ( 20UL )
@@ -46,16 +43,13 @@ enum ALM_EN
     ALM_EN_ON   =   ( 1UL<<ALM_EN_SHIFT )   
 }alm_en;
 
+#define TICK_MASK       ((uint32_t) ( 1UL<<TICK_SHIFT ))
 #define ALM_TRG_MASK    ((uint32_t) ( 1UL<<ALM_TRG_SHIFT ))
 #define STARTUP_MASK    ((uint32_t) ( 1UL<<STARTUP_SHIFT ))
 #define STATE_MASK      ((uint32_t) ( 3UL<<STATE_SHIFT ))
 #define ALM_EN_MASK     ((uint32_t) ( 1UL<<ALM_EN_SHIFT ))
 #define FLD_MASK        ((uint32_t) ( 3UL<<FLD_SHIFT ))
 #define TIME_MASK       ((uint32_t) 0x0001FFFF)
-
-
-
-enum MERIDIAN {AM, PM};
 
 
 /* Priorities at which the tasks are created. */
@@ -101,7 +95,7 @@ static void tskWriteDC   (void *pvParameters);
 
 /*-----------------------------------------------------------*/
 
-/* The queue used by Controller and WriteLC tasks. */
+/* The queue used by Controller and WriteDC tasks. */
 static QueueHandle_t queueWriteDC = NULL;
 /* The queue used by ReadLPC, ReadTime, and Controller tasks. */
 static QueueHandle_t queueController = NULL;
@@ -336,7 +330,7 @@ static void tskController(void *pvParameters)
                     // Clear and Re-set active field
                     act_fld = ACT_SEC;
                     ulQueuedValue &= ~(FLD_MASK);
-                    ulQueuedValue != act_fld;
+                    ulQueuedValue |= act_fld;
                     
                     // Clear and Replace STime
                     ulQueuedValue &= ~(TIME_MASK);
@@ -391,7 +385,7 @@ static void tskController(void *pvParameters)
                     
                     act_fld = ACT_HH;
                     ulQueuedValue &= ~(FLD_MASK);
-                    ulQueuedValue != act_fld;
+                    ulQueuedValue |= act_fld;
 
                     // Change State
                     ulQueuedValue &= ~(STATE_MASK);
@@ -418,7 +412,9 @@ static void tskController(void *pvParameters)
                             State = NORMAL;
                             bNEWSTATE = true;
                             if(bUPDATE_TIME)
+                            {
                                 NTime = STime;
+                            }
                         }
                         break;
 
@@ -483,7 +479,7 @@ static void tskController(void *pvParameters)
                         }  
                 }
                 ulQueuedValue &= ~(FLD_MASK);
-                ulQueuedValue != act_fld;
+                ulQueuedValue |= act_fld;
                 
                 // Clear and Re-set active field
                 ulQueuedValue &= ~(FLD_MASK);
@@ -507,7 +503,7 @@ static void tskController(void *pvParameters)
                     // Initialize active field to HH
                     act_fld = ACT_HH;
                     ulQueuedValue &= ~(FLD_MASK);
-                    ulQueuedValue != act_fld;
+                    ulQueuedValue |= act_fld;
 
                     // Change State
                     ulQueuedValue &= ~(STATE_MASK);
@@ -623,8 +619,13 @@ static void tskController(void *pvParameters)
                     else
                         NTime = 0UL;
                 }
+                //Set Tick bit
+                ulQueuedValue &= ~(TICK_MASK);
+                ulQueuedValue |= TICK_MASK;
                 /* queue input. */
                 xQueueSend(queueWriteDC, &ulQueuedValue, 0U);
+                // Clear Tick bit
+                ulQueuedValue &= ~(TICK_MASK);
                 break;
         }
     }
@@ -713,7 +714,8 @@ static void tskWriteDC( void *pvParameters )
         if(hh<10UL)
             lcd.print(" ");
 
-         bFlash = !bFlash;
+        if(ulReceivedValue&TICK_MASK)
+            bFlash = !bFlash;
 
 
 //        switch(curstate)
