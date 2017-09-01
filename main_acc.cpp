@@ -653,25 +653,6 @@ static void tskController(void *pvParameters)
 
 /*-----------------------------------------------------------*/
 
-//byte smiley[8] = {
-//  B00000,
-//  B10001,
-//  B00000,
-//  B00000,
-//  B10001,
-//  B01110,
-//  B00000,
-//};
-//
-//byte upline[8] = {
-//  B11111,
-//  B00000,
-//  B00000,
-//  B00000,
-//  B00000,
-//  B00000,
-//  B00000,
-//};
 
 static void tskWriteDC( void *pvParameters )
 {
@@ -818,7 +799,7 @@ static void tskWriteDC( void *pvParameters )
                 lcd.print(" ");
                 if((ulReceivedValue&FLD_MASK) == ACT_HH)
                 {
-                    if(bFlash)
+                    if(bFlash )
                         lcd.print(meridien);
                     else
                         lcd.print("  ");
